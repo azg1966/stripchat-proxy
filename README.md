@@ -1,5 +1,5 @@
 # Stripchat Proxy
-Its copy of [cp-standalone](https://github.com/aitschti/scp-standalone) ported to [AioHTTP](https://github.com/aio-libs/aiohttp) framework.
+Its copy of [scp-standalone](https://github.com/aitschti/scp-standalone) ported to [AioHTTP](https://github.com/aio-libs/aiohttp) framework.
 
 ## Install (in Linux)
 Clone this repo  

@@ -1,27 +1,34 @@
-from argparse import ArgumentParser
 import base64
 import hashlib
-from itertools import cycle
 import json
 import logging
-from random import randint
+import os
 import re
 import typing as t
-from aiohttp import (
-    web,
-    ClientSession,
-    ClientResponseError,
-    ClientConnectionError,
-    ClientProxyConnectionError,
-)
-import os
-from yarl import URL
-from multidict import CIMultiDictProxy
+from argparse import ArgumentParser
 from functools import cached_property
-from aiohttp_socks import ProxyType, ProxyConnector, ProxyConnectionError
+from itertools import cycle
+from random import randint
+
+from aiohttp import (ClientConnectionError, ClientProxyConnectionError,
+                     ClientResponseError, ClientSession, web)
+from aiohttp_socks import ProxyConnectionError, ProxyConnector
+from multidict import CIMultiDictProxy
+from yarl import URL
 
 
-APP_DECODE_KEY = web.AppKey("decode_key", str)
+class KeyStorage:
+    def __init__(self) -> None:
+        self._key: str | None = None
+    @property
+    def key(self) -> str | None:
+        return self._key
+    
+    @key.setter
+    def key(self, value: str | None) -> None:
+        self._key = value
+
+APP_DECODE_KEY = web.AppKey("decode_key", KeyStorage)
 APP_SESSION_KEY = web.AppKey("session", ClientSession)
 APP_SOCKS_SESSION_KEY = web.AppKey("socks_session", ClientSession)
 APP_PROXY_URL = web.AppKey("http_proxy_url", URL)
@@ -307,12 +314,13 @@ class PlaylistView(BaseView):
         return decode_key
 
     async def get_key(self) -> str:
-        if not self.request.config_dict[APP_DECODE_KEY]:
+        key_storage = self.request.config_dict[APP_DECODE_KEY]
+        if not key_storage.key:
             try:
-                self.request.app[APP_DECODE_KEY] = await self._fetch_key()
+                key_storage.key = await self._fetch_key()
             except Exception as e:
                 raise web.HTTPBadRequest(reason=f"Cannot fetch decode key: {e}")
-        return self.request.config_dict[APP_DECODE_KEY]
+        return key_storage.key
 
     @staticmethod
     def pad_base64(s: str) -> str:
@@ -547,7 +555,7 @@ async def create_app(
     mirror: str | None = None,
 ) -> web.Application:
     app = web.Application(middlewares=[web.normalize_path_middleware()])
-    app[APP_DECODE_KEY] = ""
+    app[APP_DECODE_KEY] = KeyStorage()
     app.cleanup_ctx.append(setup_session)
     app[APP_STRIPCHAT_HOST_KEY] = mirror or DEFAULT_STRIPCHAt_HOST
 
