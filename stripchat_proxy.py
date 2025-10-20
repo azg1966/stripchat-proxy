@@ -1,17 +1,24 @@
 import base64
+from collections import UserDict
 import hashlib
 import json
 import logging
 import os
 import re
+from time import time
 import typing as t
 from argparse import ArgumentParser
 from functools import cached_property
 from itertools import cycle
 from random import randint
 
-from aiohttp import (ClientConnectionError, ClientProxyConnectionError,
-                     ClientResponseError, ClientSession, web)
+from aiohttp import (
+    ClientConnectionError,
+    ClientProxyConnectionError,
+    ClientResponseError,
+    ClientSession,
+    web,
+)
 from aiohttp_socks import ProxyConnectionError, ProxyConnector
 from multidict import CIMultiDictProxy
 from yarl import URL
@@ -20,13 +27,15 @@ from yarl import URL
 class KeyStorage:
     def __init__(self) -> None:
         self._key: str | None = None
+
     @property
     def key(self) -> str | None:
         return self._key
-    
+
     @key.setter
     def key(self, value: str | None) -> None:
         self._key = value
+
 
 APP_DECODE_KEY = web.AppKey("decode_key", KeyStorage)
 APP_SESSION_KEY = web.AppKey("session", ClientSession)
@@ -260,9 +269,10 @@ class ModelView(BaseView):
             if not line.startswith("#"):
                 remote_url = URL(line)
                 assert remote_url.host
-                line = self.url_for(
-                    "playlist", path=remote_url.path.lstrip("/")
-                ).update_query(psch=psch, pkey=pkey, host=remote_url.host)
+                path = remote_url.path.lstrip("/")
+                line = self.url_for("playlist", path=path).update_query(
+                    psch=psch, pkey=pkey, host=remote_url.host
+                )
                 line = str(line)
             out.append(line)
         return "\n".join(out)
@@ -554,7 +564,11 @@ async def create_app(
     geo_bypass_proxy: str | None = None,
     mirror: str | None = None,
 ) -> web.Application:
-    app = web.Application(middlewares=[web.normalize_path_middleware()])
+    app = web.Application(
+        middlewares=[
+            web.normalize_path_middleware(append_slash=False, remove_slash=True)
+        ]
+    )
     app[APP_DECODE_KEY] = KeyStorage()
     app.cleanup_ctx.append(setup_session)
     app[APP_STRIPCHAT_HOST_KEY] = mirror or DEFAULT_STRIPCHAt_HOST
@@ -563,9 +577,9 @@ async def create_app(
         app.cleanup_ctx.append(setup_proxy(geo_bypass_proxy))
     app.add_routes(
         [
-            web.view("/chunk/{path:.+}/", ChunkView, name="chunk_view"),
-            web.view("/chunklist/{path:.+}/", PlaylistView, name="playlist"),
-            web.view("/{model_name:.*}/", ModelView, name="model"),
+            web.view("/chunk/{path:.+}", ChunkView, name="chunk_view"),
+            web.view("/chunklist/{path:.+}", PlaylistView, name="playlist"),
+            web.view("/{model_name:.*}", ModelView, name="model"),
         ]
     )
     return app
